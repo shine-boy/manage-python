@@ -136,15 +136,11 @@ if __name__ == "__main__":
     # filter_mongo(mydb)
     # choice = mydb["choice"]
     # print(choice.estimated_document_count())
-    import time
-    import datetime
 
-    times=['9:00',"11:30","13:00",'15:00']
-    now = datetime.datetime.now()
-    for i in range(len(times)):
-        temp=times[i].split(":")
-        times[i]=datetime.datetime(year=now.year,month=now.month,day=now.day,hour=int(temp[0]),second=int(temp[1]))
+    from datetime import datetime
+    from hack.spider.jipiao import Jipiao
+    ji=Jipiao()
+    print(ji.qunaLvXing())
 
-
-    print(times)
+    # print(datetime.now().isoweekday())
     pass

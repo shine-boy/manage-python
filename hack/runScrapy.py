@@ -1,10 +1,8 @@
-
+# coding=utf-8
 import datetime
-from hack.include.util import isNull
+from hack.util import isNull
 import pymongo
-import schedule
 import threading
-import requests
 from wsgiref.simple_server import make_server
 import json
 import math
@@ -13,6 +11,8 @@ import time
 from flask import Response, Flask, request
 from flask_cors import CORS
 import os
+import hack.include.rili as rili
+from hack.include.page import Page
 app = Flask(__name__)
 myclient = pymongo.MongoClient("mongodb://192.168.142.1:27017/")
 mydb = myclient["local"]
@@ -60,38 +60,59 @@ def getStartTime(startTime,day=0,hours=0,minute=0,second=0):
 #     time.sleep(10)
 #     os.system("cd /d E:\git\spider\houseNew && scrapy crawl anjuke_kpsj")
 
-@sched.scheduled_job('interval',days=1)
+@sched.scheduled_job('interval',days=1,misfire_grace_time=3600)
 def dowangyiyun():
     print('rere')
-    os.system("cd E:\git\/bigData && scrapy crawl wangyiyun")
+    # os.system("cd E:\git\/bigData && scrapy crawl wangyiyun")
+    os.system("scrapy crawl wangyiyun")
 
 
-
-@sched.scheduled_job('cron',day_of_week="0-4")
 def dongfangcaifu():
     print('tests')
+    if not rili.isStockDeal():
+        return
     times = ['9:00', "11:30", "13:00", '15:00']
     now = datetime.datetime.now()
     for i in range(len(times)):
         temp = times[i].split(":")
+
         times[i] = datetime.datetime(year=now.year, month=now.month, day=now.day, hour=int(temp[0]),
-                                     second=int(temp[1]))
+                                     minute=int(temp[1]))
 
     def test():
         print('test')
-    for i in range(0,len(times),2):
-        sched.add_job(test, 'interval', seconds=10,end_date=times[i+1],start_date=times[i])
+        os.system("scrapy crawl dongfangcaifu")
+
+    for i in range(0, len(times), 2):
+        if times[i+1] < now:
+            continue
+        if times[i] < now:
+            times[i] = datetime.datetime(year=now.year, month=now.month, day=now.day, hour=now.hour,
+                                         minute=now.minute+1)
+        sched.add_job(test, 'interval', minutes=2, end_date=times[i + 1], start_date=times[i])
     # os.system("cd E:\git\/bigData && scrapy crawl dongfangcaifu")
 
+@sched.scheduled_job('cron',day_of_week="0-4",misfire_grace_time=3600)
+def do_dongfangcaifu():
+    dongfangcaifu()
+
+
+
 def doSched():
+    print('start')
+    # threading.Thread(target=dowangyiyun).start()
+    threading.Thread(target=dongfangcaifu).start()
     sched.start()
+
 
 @app.before_first_request
 def before_first_request():
+    pass
     # data={"cmd":"scrapy crawl wangyiyun"}
     # threading.Thread(target=cmd_job, args=(data,)).start()
-    print('start')
-    threading.Thread(target=doSched).start()
+    # print('start')
+    # threading.Thread(target=doSched).start()
+
 
 def cmd_job(data):
     print("start%s"%data.get("url"))
@@ -133,6 +154,15 @@ def deleteWangyiyun():
     response.data=json.dumps({'data':"success"})
     return response
 
+class DateEncoder(json.JSONEncoder):
+    def default(self, obj):
+        if isinstance(obj, datetime.datetime):
+            return obj.strftime('%Y-%m-%d %H:%M:%S')
+        elif isinstance(obj, datetime.date):
+            return obj.strftime("%Y-%m-%d")
+        else:
+            return json.JSONEncoder.default(self, obj)
+
 CORS(app,resources=r"/*")
 @app.route('/wangyiyun', methods=['POST','GET'])
 def seachWangyiyun():
@@ -143,34 +173,27 @@ def seachWangyiyun():
             data=request.form
     else:
         data = request.args
-    page=data.get("page")
-    if page is None:
-        page={
-            "pageSize":10,
-            "current":1
-        }
-    else:
-        if page.get("pageSize") is None:
-            page["pageSize"]=10
-        if page.get("current") is None or page.get("current")==0:
-            page["current"]=1
-        page["pageSize"]=int(page.get("pageSize"))
-        page["current"] = int(page.get("current"))
-        print(page)
+    page=Page(data.get("page")).page
+
     comments = mydb["comments"]
     query = {"comments.likedCount":{"$gt":2}}
-
-    lis = comments.find(query, { "comments.$": 1,"type": 1, "name": 1, "artists": 1, "url": 1,"id":1,"_id":0}).sort(
-        "comments.likedCount", -1).limit(page.get("pageSize")).skip(page.get("pageSize")*page.get("current"))
+    sort=[]
+    sortType = data.get("sort")
+    if sortType is None:
+        sort=[("comments.likedCount", -1)]
+    else:
+        sort=[(sortType,-1)]
+    lis = comments.find(query, { "_id":0}).sort(sort).limit(page.get("pageSize")).skip(page.get("pageSize")*page.get("current"))
     lis = list(lis)
     #
     result={
         'data':lis,
         'total':comments.estimated_document_count()
     }
+    print(len(lis))
     response=Response()
     response.headers={"Access-Control-Allow-Origin":"*"}
-    response.data=json.dumps(result)
+    response.data=json.dumps(result,cls=DateEncoder)
     return response
 
 
@@ -185,20 +208,7 @@ def seachprojectExam():
             data=request.form
     else:
         data = request.args
-    page=data.get("page")
-    if page is None:
-        page={
-            "pageSize":10,
-            "current":1
-        }
-    else:
-        if page.get("pageSize") is None:
-            page["pageSize"]=10
-        if page.get("current") is None or page.get("current")==0:
-            page["current"]=1
-        page["pageSize"]=int(page.get("pageSize"))
-        page["current"] = int(page.get("current"))
-        print(page)
+    page=Page(data.get("page")).page
     type_=data.get("questionType","choice")
     comments = projectExam[type_]
     query = {}
@@ -226,9 +236,9 @@ if __name__ == '__main__':
     # while True:
     #     schedule.run_pending()
     #     time.sleep(1)
-    print("start")
+    threading.Thread(target=doSched).start()
     server = make_server('0.0.0.0', 5000, app)
     server.serve_forever()
-    # sched.start()
+
 
     # pass

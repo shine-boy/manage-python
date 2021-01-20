@@ -47,7 +47,7 @@ class dongfang(scrapy.Spider):
         '_': int(time.time())
         }
         # type=types[0]
-        for type in types:
+        for type in types[:1]:
             param['fs']=type['fs']
             url = type['url']+"?"+parse.urlencode(param)
             yield scrapy.Request(url=url, dont_filter=True, callback=self.parsePage,meta={"param":param,'url':type['url']})
@@ -92,7 +92,10 @@ class dongfang(scrapy.Spider):
             des.insert_one(insert)
 
     def parsePage(self, response):
-        res=json.loads(response.text)
+        text=response.text
+        res=json.loads(text[text.find("{"):-2])
+
+
         total=res['data']['total']
         param=response.meta['param']
 
@@ -106,7 +109,8 @@ class dongfang(scrapy.Spider):
 
 
     def parse(self,response):
-        res = json.loads(response.text)
+        text = response.text
+        res = json.loads(text[text.find("{"):-2])
         data=res['data']['diff']
         current=response.meta['time']
         for doc in data:

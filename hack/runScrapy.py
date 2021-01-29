@@ -6,13 +6,14 @@ import threading
 from wsgiref.simple_server import make_server
 import json
 import math
+from hack.include import Stock,Page
 from apscheduler.schedulers.blocking import BlockingScheduler
+from apscheduler.schedulers.background import BackgroundScheduler
 import time
 from flask import Response, Flask, request
 from flask_cors import CORS
 import os
 import hack.include.rili as rili
-from hack.include.page import Page
 app = Flask(__name__)
 myclient = pymongo.MongoClient("mongodb://192.168.142.1:27017/")
 mydb = myclient["local"]
@@ -20,7 +21,8 @@ projectExam=myclient["projectExam"]
 wednesdayList=['jiangxicq_sw_dl','changjianghouse_dl','nmgcq_dl','xj_cq_dl2','guizhoucq_sw_dl']
 thursdayList=['jsgq_dl_new']
 scrapyEvery=['anjuke_update_second3','anjuke_update_second2']
-sched = BlockingScheduler()
+sched = BackgroundScheduler()
+
 def job(name):
     os.system("scrapy crawl "+name)
 
@@ -69,9 +71,11 @@ def dowangyiyun():
 
 def dongfangcaifu():
     print('tests')
+
     if not rili.isStockDeal():
         return
-    times = ['9:00', "11:30", "13:00", '15:00']
+    stock = Stock()
+    times = ['9:01', "11:31", "13:01", '15:01']
     now = datetime.datetime.now()
     for i in range(len(times)):
         temp = times[i].split(":")
@@ -81,15 +85,18 @@ def dongfangcaifu():
 
     def test():
         print('test')
-        os.system("scrapy crawl dongfangcaifu")
-
+        # os.system("scrapy crawl dongfangcaifu")
+        ti=time.time()
+        stock.do(stock.insert_mongo)
+        stock.waiter()
+        print(time.time()-ti)
     for i in range(0, len(times), 2):
         if times[i+1] < now:
             continue
         if times[i] < now:
             times[i] = datetime.datetime(year=now.year, month=now.month, day=now.day, hour=now.hour,
                                          minute=now.minute+1)
-        sched.add_job(test, 'interval', minutes=2, end_date=times[i + 1], start_date=times[i])
+        sched.add_job(test, 'interval', minutes=2, end_date=times[i + 1], start_date=times[i],max_instances=10,misfire_grace_time=3600)
     # os.system("cd E:\git\/bigData && scrapy crawl dongfangcaifu")
 
 @sched.scheduled_job('cron',day_of_week="0-4",misfire_grace_time=3600)
@@ -183,7 +190,7 @@ def seachWangyiyun():
         sort=[("comments.likedCount", -1)]
     else:
         sort=[(sortType,-1)]
-    lis = comments.find(query, { "_id":0}).sort(sort).limit(page.get("pageSize")).skip(page.get("pageSize")*page.get("current"))
+    lis = comments.find(query, { "_id":0}).sort(sort).limit(page.get("pageSize")).skip(page.get("pageSize")*(page.get("current")-1))
     lis = list(lis)
     #
     result={
@@ -216,12 +223,14 @@ def seachprojectExam():
         query['content']={'$regex':".*"+data.get("content")+".*"}
     if isNull(data.get("type")) is False:
         query['type']={'$regex':".*"+data.get("type")+".*"}
-    lis = comments.find(query,{"_id":0}).limit(page.get("pageSize")).skip(page.get("pageSize")*page.get("current"))
+    print(page)
+    lis = comments.find(query,{"_id":0}).limit(page.get("pageSize")).skip(page.get("pageSize")*(page.get("current")-1))
     lis = list(lis)
     #
+    # print(comments.count_documents(filter=query))
     result = {
         'data': lis,
-        'total': comments.estimated_document_count()
+        'total': comments.count_documents(filter=query)
     }
     response=Response()
     response.headers={"Access-Control-Allow-Origin":"*"}

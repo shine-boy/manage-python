@@ -1,1 +1,9 @@
-мЬрвтфрТюжеюх║╫е╠╬
+О©╫О©╫О©╫О©╫О©╫О©╫О©╫О©╫О©╫О©╫О©╫О©╫х║О©╫е╠О©╫
+
+pymongo
+Scrapy
+APScheduler
+Flask
+Flask-Cors
+requests-html
+PyExecJS

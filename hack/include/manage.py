@@ -40,7 +40,7 @@ def insertFlag(obj,db,keys=["content","type","ans","A","B","C","D"]):
 
 # 舍弃的部分，去除不规则的数据
 def dropFlag(st):
-    if re.sub("^\d+[、]","",st) =="":
+    if re.sub("^(\d+|[ABCDEFGHIJ])[、.]","",st) =="":
         return True
     # pater=re.compile("\d+[、]")
     # result=pater.match(st)
@@ -83,8 +83,17 @@ def insert_mongo(result,mydb):
                 if insertFlag(li,multiSelect.find_one({'content':li["content"]})):
                     multiSelect.insert_one(li)
 
+# xpath列表获取其内容文本
+def string_(lis):
+    result=''
+    for li in lis:
+        result+=li.xpath("string(.)")
+    return result
+
+
+
 def htmlTo_mongo(path,mydb):
-    html=etree.parse(path,parser=etree.HTMLParser(encoding='utf-8'))
+    html=etree.parse(path,parser=etree.HTMLParser(encoding='GBK'))
 
     types=html.xpath("//div[@id='con_xz_1']")
     result=[]
@@ -97,18 +106,33 @@ def htmlTo_mongo(path,mydb):
         temp=[]
         for li in lis:
             o={}
-            o['content']=filter_null(li.xpath("div[1]/p")[0].xpath("string(.)"),'content')
+            print(string_(li.xpath("div[1]/p")))
+            o['content']=filter_null(string_(li.xpath("div[1]/p")),'content')
             if dropFlag(o['content']):
                 continue
             ans=li.xpath("div[1]/div[@class='f_l']/p")
+            anst=0
+            ans_=''
             for i in range(len(ans)):
-                o[anstype[i]]=filter_null(ans[i].xpath("string(.)"),anstype[i])
+                ans_+=filter_null(ans[i].xpath("string(.)"),anstype[anst])
+                print(ans_)
+                if dropFlag(ans_) is False:
+                    o[anstype[anst]]=ans_
+                    anst+=1
+                    ans_=''
+
             o["ans"]=filter_null(li.xpath("p[1]")[0].xpath("string(.)"),'ans')
             o["type"]=filter_null(li.xpath("p[2]")[0].xpath("string(.)"),'type')
             temp.append(o)
         obj["list"]=temp
         result.append(obj)
-    print(result)
+    # for ti in result:
+    #     print(ti['title'])
+    #     for li in ti['list']:
+    #         print(li)
+    print(len(result))
+    print(len(result[0]['list']))
+    print(len(result[1]['list']))
     insert_mongo(result,mydb)
 
 # 清洗数据
@@ -128,7 +152,8 @@ if __name__ == "__main__":
     myclient = pymongo.MongoClient("mongodb://192.168.142.1:27017/")
     mydb = myclient["projectExam"]
     # choice = mydb["choice"]
-    # with open("C:\\Users\liu_hfei\Desktop\\test.html",'r',encoding='utf-8') as f:
+    htmlTo_mongo("C:\\Users\liu_hfei\Desktop\\" + 'base64.txt', mydb)
+    # with open("C:\\Users\liu_hfei\Desktop\\base64.txt",'r',encoding='GBK') as f:
     #     print(f.read())
     # paths=["test.html","CVICSE E-Learning系统.html","项目经理考试页面.htm"]
     # for parh in paths:
@@ -138,9 +163,7 @@ if __name__ == "__main__":
     # print(choice.estimated_document_count())
 
     from datetime import datetime
-    from hack.spider.jipiao import Jipiao
-    ji=Jipiao()
-    print(ji.qunaLvXing())
+
 
     # print(datetime.now().isoweekday())
     pass

@@ -4,6 +4,8 @@ from urllib import parse
 import json
 import math
 import pymongo
+import requests
+import hack.include.stock as stock
 from datetime import datetime
 class dongfang(scrapy.Spider):
     name='dongfangcaifu'
@@ -47,7 +49,7 @@ class dongfang(scrapy.Spider):
         '_': int(time.time())
         }
         # type=types[0]
-        for type in types[:1]:
+        for type in types:
             param['fs']=type['fs']
             url = type['url']+"?"+parse.urlencode(param)
             yield scrapy.Request(url=url, dont_filter=True, callback=self.parsePage,meta={"param":param,'url':type['url']})
@@ -82,7 +84,7 @@ class dongfang(scrapy.Spider):
             "f25", "",
             "f62", "",
             "f115", "",
-            "f128", "最新价",
+            "f128", "",
             "f136", "",
             "f140", "",
             "f141", "",
@@ -100,11 +102,11 @@ class dongfang(scrapy.Spider):
         param=response.meta['param']
 
         for i in range(1,math.ceil(total/param['pz'])+1):
-            print(i)
             param['pn']=i
             current=datetime.now()
             param['-'] = int(current.timestamp())
             url = response.meta['url']+"?"+parse.urlencode(param)
+
             yield scrapy.Request(url=url, dont_filter=True, callback=self.parse,meta={"time":current})
 
 
@@ -118,5 +120,11 @@ class dongfang(scrapy.Spider):
             if names.find_one({'code': doc['f12']}) is None:
                 names.insert_one({'code': doc['f12'], 'name': doc['f14']})
             colloction=self.mydb[doc['f12']]
-            doc["time"]=current
+
+            doc.update(stock.get_realtime_quotes(doc['f12']))
+            doc["time"] = current
             colloction.insert_one(doc)
+
+if __name__ == '__main__':
+    d=dongfang()
+    print(list(d.mydb['931144'].find()))

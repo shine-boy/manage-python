@@ -271,7 +271,6 @@ class Stock:
 
 
 
-
 if __name__ == '__main__':
     stock=Stock()
     ti=time.time()

@@ -27,7 +27,7 @@ class demo(scrapy.Spider):
 
     # 上海产权交易所股权
     def start_requests(self):
-        url = 'https://www.suaee.com/manageprojectweb/foreign/project/queryAllNew'
+        url = 'https://api.bilibili.com/pgc/season/index/result'
 
         yield scrapy.Request(url=url, dont_filter=True, callback=self.parse,headers=self.headers,
                              meta={"handle_httpstatus_all": True},

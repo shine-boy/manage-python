@@ -34,9 +34,11 @@ def doWeek(lis):
 # 获取重启后的首次执行时间
 def getStartTime(startTime,day=0,hours=0,minute=0,second=0):
     today = datetime.datetime.today()
-    if startTime:
-        return today
+    if startTime > today:
+        return startTime
     interval=(second+60*(minute+60*(hours+day*24)))
+    if interval==0:
+        interval=1
     print(interval)
     space=today.timestamp() - startTime.timestamp()
     print(space)
@@ -62,7 +64,7 @@ def getStartTime(startTime,day=0,hours=0,minute=0,second=0):
 #     time.sleep(10)
 #     os.system("cd /d E:\git\spider\houseNew && scrapy crawl anjuke_kpsj")
 
-@sched.scheduled_job('interval',days=1,misfire_grace_time=3600)
+@sched.scheduled_job('interval',days=1,misfire_grace_time=3600,start_date=getStartTime(datetime.datetime(2021, 2, 2, 18, 0, 0),day=1))
 def dowangyiyun():
     print('rere')
     # os.system("cd E:\git\/bigData && scrapy crawl wangyiyun")
@@ -75,7 +77,7 @@ def dongfangcaifu():
     if not rili.isStockDeal():
         return
     stock = Stock()
-    times = ['9:01', "11:31", "13:01", '15:01']
+    times = ['9:30', "11:31", "13:00", '15:01']
     now = datetime.datetime.now()
     for i in range(len(times)):
         temp = times[i].split(":")
@@ -84,7 +86,7 @@ def dongfangcaifu():
                                      minute=int(temp[1]))
 
     def test():
-        print('test')
+        print('time')
         # os.system("scrapy crawl dongfangcaifu")
         ti=time.time()
         stock.do(stock.insert_mongo)
@@ -139,7 +141,6 @@ def runcmd():
         data = request.args
 
     threading.Thread(target=cmd_job,args=(data,)).start()
-
     return ""
 
 CORS(app,resources=r"/*")
@@ -202,8 +203,6 @@ def seachWangyiyun():
     response.headers={"Access-Control-Allow-Origin":"*"}
     response.data=json.dumps(result,cls=DateEncoder)
     return response
-
-
 
 CORS(app,resources=r"/*")
 @app.route('/projectExam', methods=['POST','GET'])

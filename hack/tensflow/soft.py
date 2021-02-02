@@ -7,16 +7,16 @@ import os
 import sys
 import pymongo
 import io
-# import seaborn as sns
+import seaborn as sns
 #
-import tensorflow as tf
-#
+# import tensorflow as tf
+# #
 # from tensorflow import keras
 # from tensorflow.keras import layers
 
-myclient = pymongo.MongoClient("mongodb://192.168.128.146:27018")
-mydb = myclient['pledge']
-sys.stdout = io.TextIOWrapper(sys.stdout.buffer, encoding='gb18030')
+myclient = pymongo.MongoClient("mongodb://192.168.142.1:27017")
+mydb = myclient['dongfangcaifu']
+# sys.stdout = io.TextIOWrapper(sys.stdout.buffer, encoding='gb18030')
 
 
 def find(lis, target):
@@ -83,7 +83,32 @@ def to_one(label, dataFrame):
         column.loc[i] = findIndex(types, column[i])
     dataFrame[label] = column
     return column
-    print(column)
+
+def getStockData():
+    names=mydb['names'].find({})
+    # names=list(ns)
+    result=[]
+    def isNext(current,next):
+        t=next.timestamp()-current.timestamp()
+        if t>110 and t<130:
+            return True
+        return False
+
+    for name in names:
+        code=name['code']
+        item=mydb[code].find({},{'_id':0}).sort([('time',1)])
+        current=item.next()
+        for next in item:
+            if isNext(current['time'],next['time']):
+                current['next2']=next['f43']
+                result.append(current)
+            current=next
+    data=pd.DataFrame(result)
+    data.to_csv("../data/stock.csv",index=False)
+    # print(data.head())
+
+        # print(list(item))
+
 def getData():
     column_names =  ["city", 'openTime', 'region', 'province', 'address', 'decoration', 'houseType', 'volumeRatio',
             'greenRate', 'proYears', 'planHouse', 'parkRatio', 'towards', 'proComp', 'developer', 'apartment',
@@ -95,6 +120,43 @@ def getData():
     dataset = raw_dataset.copy()
 
     print(dataset.isna().sum())
+
+
+
+
 if __name__ == '__main__':
-    getData()
+    raw_dataset = pd.read_csv('../data/stock.csv',  low_memory=False,
+                              na_values="?", comment='\t',index_col=[0],
+                              skipinitialspace=True)
+    dataset = raw_dataset.copy()
+    dataset.pop('time')
+    print(dataset.size)
+    dataset=dataset[~dataset.isin([str('-')])]
+    print(dataset.size)
+    # dataset.pop("f58")
+    # to_one('f127', dataset)
+    # to_one('f128', dataset)
+    # code=dataset['f57']
+    # code=map(lambda x:int(x),code)
+    # dataset['f57']=list(code)
+    # dataset.to_csv("../data/stock.csv")
+    train_dataset = dataset.sample(frac=0.8, random_state=0)
+    test_dataset = dataset.drop(train_dataset.index)
+
+    train_labels = train_dataset.pop('next2')
+    test_labels = test_dataset.pop('next2')
+
+    train_dataset = train_dataset.astype(float)
+    train_stats = train_dataset.describe()
+    # 转置
+    train_stats = train_stats.transpose()
+    print(train_stats)
+    print(train_dataset.keys())
+    # 数据规范化，归一化
+    def norm(x):
+        return (x - train_stats['mean']) / train_stats['std']
+
+    normed_train_data = norm(train_dataset)
+    normed_test_data = norm(test_dataset)
+
     pass
